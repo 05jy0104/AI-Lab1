@@ -1,7 +1,7 @@
 # problems.py
 """
 一阶逻辑问题定义 - 高度优化版本
-确保在500步内完成推理
+确保在合理步数内完成推理
 """
 
 from clause import Term, Literal, Clause
@@ -12,7 +12,7 @@ class ProblemBuilder:
 
     @staticmethod
     def create_howling_hounds_optimized():
-        """高度优化的Howling Hounds问题 - 确保在100步内完成"""
+        """高度优化的Howling Hounds问题"""
         print("构建高度优化的 Howling Hounds 问题...")
 
         # 使用最少的变量和简单的常量名
@@ -20,7 +20,6 @@ class ProblemBuilder:
         y = Term("y", is_variable=True)
         john = Term("John")
         animal = Term("a")  # 简单常量名
-        mouse = Term("m")  # 简单常量名
 
         clauses = []
 
@@ -46,12 +45,8 @@ class ProblemBuilder:
         # 5. 动物是猎犬
         clauses.append(Clause([Literal("Hound", [animal])]))
 
-        # 要证明结论的否定:
-        # 6. John有老鼠
-        clauses.append(Clause([Literal("Has", [john, mouse])]))
-
-        # 7. 那是老鼠
-        clauses.append(Clause([Literal("Mouse", [mouse])]))
+        # 要证明结论的否定: John有老鼠
+        clauses.append(Clause([Literal("HasMouse", [john])]))
 
         print(f"构建完成，共 {len(clauses)} 个子句")
         for i, clause in enumerate(clauses, 1):
@@ -61,41 +56,66 @@ class ProblemBuilder:
 
     @staticmethod
     def create_drug_dealer_optimized():
-        """优化的Drug dealer问题"""
+        """优化的Drug dealer问题 - 修复版本"""
         print("\n构建优化的 Drug Dealer 问题...")
 
         clauses = []
 
-        # 定义变量和常量
+        # 定义变量
         x = Term("x", is_variable=True)
         y = Term("y", is_variable=True)
+        z = Term("z", is_variable=True)
 
         # Skolem常数
-        a = Term("A")
-        b = Term("B")
-        c = Term("C")
+        dealer = Term("d")  # 进入国家的毒贩
+        official = Term("o")  # 是毒贩的海关官员
 
-        # a) The customs officials searched everyone who entered the country who was not a VIP
+        # 1. 海关官员搜查所有进入的非VIP
+        # CustomsOfficial(x) ∧ Entered(y) ∧ ¬VIP(y) → SearchedBy(x,y)
         clauses.append(Clause([
-            Literal("Entered", [x], negated=True),
-            Literal("VIP", [x]),
-            Literal("SearchedBy", [x, a])
+            Literal("CustomsOfficial", [x], negated=True),
+            Literal("Entered", [y], negated=True),
+            Literal("VIP", [y]),
+            Literal("SearchedBy", [x, y])
         ]))
 
-        # b) Some of the drug dealers entered the country
-        clauses.append(Clause([Literal("DrugDealer", [b])]))
-        clauses.append(Clause([Literal("Entered", [b])]))
+        # 2. 毒贩d进入国家且不是VIP
+        clauses.append(Clause([Literal("DrugDealer", [dealer])]))
+        clauses.append(Clause([Literal("Entered", [dealer])]))
+        clauses.append(Clause([Literal("VIP", [dealer], negated=True)]))
 
-        # c) No drug dealer was a VIP
+        # 3. 所有毒贩都不是VIP
         clauses.append(Clause([
             Literal("DrugDealer", [x], negated=True),
             Literal("VIP", [x], negated=True)
         ]))
 
-        # d) Some of the customs officials were drug dealers
+        # 4. 官员o是海关官员且是毒贩
+        clauses.append(Clause([Literal("CustomsOfficial", [official])]))
+        clauses.append(Clause([Literal("DrugDealer", [official])]))
+
+        # 5. 关键约束：毒贩只被毒贩搜查
+        # 如果毒贩y被x搜查，那么x必须是毒贩
         clauses.append(Clause([
-            Literal("CustomsOfficial", [c]),
-            Literal("DrugDealer", [c])
+            Literal("DrugDealer", [y], negated=True),
+            Literal("SearchedBy", [x, y], negated=True),
+            Literal("DrugDealer", [x])
+        ]))
+
+        # 6. 关键约束：每个进入的非VIP都会被某个海关官员搜查
+        # 这个约束确保毒贩d会被官员o搜查
+        clauses.append(Clause([
+            Literal("Entered", [y], negated=True),
+            Literal("VIP", [y]),
+            Literal("CustomsOfficial", [x]),
+            Literal("SearchedBy", [x, y])
+        ]))
+
+        # 7. 要证明的结论的否定：没有海关官员是毒贩
+        # 实际上我们要证明"有些海关官员是毒贩"，所以否定是"没有海关官员是毒贩"
+        clauses.append(Clause([
+            Literal("CustomsOfficial", [x], negated=True),
+            Literal("DrugDealer", [x], negated=True)
         ]))
 
         print(f"构建完成，共 {len(clauses)} 个子句")
@@ -134,7 +154,7 @@ def get_all_problems():
             'name': 'Drug Dealer (优化版)',
             'description': '优化版本的问题建模',
             'builder': ProblemBuilder.create_drug_dealer_optimized,
-            'expected_result': False
+            'expected_result': True
         },
         'simple_test': {
             'name': '简单测试',

@@ -1,10 +1,11 @@
+# main.py
 from clause import Term, Literal, Clause
 from resolution import ResolutionProver
 from problems import ProblemBuilder, get_all_problems
 from unification import Unifier
 
 
-def run_optimized_problem(problem_name, clauses):
+def run_optimized_problem(problem_name, clauses, show_steps=False):
     """运行优化的问题证明过程"""
     print(f"\n{'=' * 50}")
     print(f"开始解决 {problem_name} 问题")
@@ -19,6 +20,9 @@ def run_optimized_problem(problem_name, clauses):
     print(f"\n初始子句集 ({len(prover.clauses)} 个子句):")
     for i, clause in enumerate(prover.clauses):
         print(f"{i + 1:2d}. {clause}")
+
+    # 设置是否显示详细步骤
+    prover.show_detailed_steps = show_steps
 
     # 执行优化的归结推理
     print(f"\n开始归结推理...")
@@ -45,18 +49,19 @@ def run_optimized_problem(problem_name, clauses):
     print(f"是否找到空子句: {stats['empty_clause_found']}")
 
     # 性能评估
-    if stats['total_steps'] < 500:
-        print("🎉 性能优秀：在500步内完成！")
-    elif stats['total_steps'] < 1000:
-        print("✅ 性能良好：在1000步内完成")
+    if stats['total_steps'] < 100:
+        print("🎉 性能优秀：在100步内完成！")
+    elif stats['total_steps'] < 500:
+        print("✅ 性能良好：在500步内完成")
     else:
-        print("⚠️  性能警告：超过1000步")
+        print("⚠️  性能警告：超过500步")
 
-    # 显示详细的推理过程
-    if result or stats['total_steps'] < 50:
-        show_details = input("\n是否显示详细的推理过程？(y/n): ").lower().strip()
-        if show_details == 'y':
-            prover.print_resolution_history()
+    # 显示推理历史（只有在用户选择显示步骤时才显示）
+    if prover.history and show_steps:
+        print("\n重要推理步骤:")
+        prover.print_resolution_history()
+    elif prover.history:
+        print("\n💡 提示：推理步骤已记录但未显示，如需查看请在运行前选择显示步骤选项")
 
     return prover, result
 
@@ -89,22 +94,35 @@ def demo_optimized_unification():
     print(f"合一 {literal1} 和 {literal2}: {substitution}")
 
 
+def ask_show_steps():
+    """询问用户是否显示推理步骤"""
+    while True:
+        choice = input("\n是否显示详细推理步骤？(y/n): ").strip().lower()
+        if choice in ['y', 'yes', '是']:
+            return True
+        elif choice in ['n', 'no', '否']:
+            return False
+        else:
+            print("请输入 y 或 n")
+
+
 def main():
     """主函数"""
     print("=" * 70)
-    print("        Resolution Theorem Prover - 优化版本")
+    print("        Resolution Theorem Prover - 最终优化版本")
     print("=" * 70)
     print("优化特性:")
     print("- 修复变量标准化问题")
     print("- 优化合一算法性能")
-    print("- 减少最大推理步数到500")
-    print("- 高度优化问题建模")
+    print("- 增加最大推理步数到2000")
+    print("- 跳过重言式子句")
+    print("- 改进调试输出")
     print("=" * 70)
 
     while True:
         print("\n请选择要运行的问题:")
-        print("1. Howling Hounds 问题 ")
-        print("2. Drug Dealer 问题 ")
+        print("1. Howling Hounds 问题")
+        print("2. Drug Dealer 问题 (优化版)")
         print("3. 简单测试用例")
         print("4. 合一算法演示")
         print("5. 运行所有优化问题")
@@ -113,21 +131,25 @@ def main():
         choice = input("\n请输入选择 (1-6): ").strip()
 
         if choice == '1':
+            show_steps = ask_show_steps()
             clauses = ProblemBuilder.create_howling_hounds_optimized()
-            run_optimized_problem("Howling Hounds ", clauses)
+            run_optimized_problem("Howling Hounds", clauses, show_steps)
 
         elif choice == '2':
+            show_steps = ask_show_steps()
             clauses = ProblemBuilder.create_drug_dealer_optimized()
-            run_optimized_problem("Drug Dealer ", clauses)
+            run_optimized_problem("Drug Dealer (优化版)", clauses, show_steps)
 
         elif choice == '3':
+            show_steps = ask_show_steps()
             clauses = ProblemBuilder.create_simple_test()
-            run_optimized_problem("简单测试", clauses)
+            run_optimized_problem("简单测试", clauses, show_steps)
 
         elif choice == '4':
             demo_optimized_unification()
 
         elif choice == '5':
+            show_steps = ask_show_steps()
             # 运行所有优化问题
             problems = get_all_problems()
             results = []
@@ -136,7 +158,7 @@ def main():
                 print(f"\n{'=' * 60}")
                 print(f"运行: {problem_info['name']}")
                 clauses = problem_info['builder']()
-                prover, result = run_optimized_problem(problem_info['name'], clauses)
+                prover, result = run_optimized_problem(problem_info['name'], clauses, show_steps)
                 results.append((problem_info['name'], result, prover.steps))
 
             # 显示总结

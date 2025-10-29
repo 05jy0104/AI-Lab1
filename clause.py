@@ -107,7 +107,7 @@ class Clause:
         return len(self.literals) == 0
 
     def standardize_variables(self, counter=None):
-        """标准化变量（修复版本）"""
+        """标准化变量（修复版本）- 自动保留常量"""
         if counter is None:
             counter = {'x': 0}
 
@@ -124,7 +124,7 @@ class Clause:
         return Clause(new_literals, self.source)
 
     def _standardize_term(self, term, var_mapping, counter):
-        """标准化单个项"""
+        """标准化单个项 - 自动保留常量"""
         if term.is_variable:
             # 相同的变量名映射到相同的新名称
             if term.name not in var_mapping:
@@ -137,4 +137,5 @@ class Clause:
             new_args = [self._standardize_term(arg, var_mapping, counter) for arg in term.args]
             return Term(term.name, False, new_args)
         else:
+            # 常量和函数符号保持不变
             return term.copy()

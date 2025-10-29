@@ -12,7 +12,8 @@ class ResolutionProver:
         self.clauses = []  # 子句集
         self.steps = 0  # 推理步数计数器
         self.history = []  # 推理历史记录
-        self.max_steps = 500  # 减少最大推理步数
+        self.max_steps = 2000  # 增加最大推理步数
+        self.show_detailed_steps = False  # 是否显示详细步骤
 
     def add_clause(self, clause):
         """添加子句到子句集"""
@@ -66,6 +67,24 @@ class ResolutionProver:
         preds2 = set((lit.predicate, not lit.negated) for lit in clause2.literals)
         return bool(preds1 & preds2)
 
+    def is_tautology(self, clause):
+        """检查子句是否是重言式（包含P和¬P）"""
+        # 简化的重言式检查，只检查完全相同的文字
+        positive_lits = set()
+        negative_lits = set()
+
+        for lit in clause.literals:
+            # 创建规范化的文字表示
+            lit_repr = (lit.predicate, tuple(str(term) for term in lit.terms))
+
+            if lit.negated:
+                negative_lits.add(lit_repr)
+            else:
+                positive_lits.add(lit_repr)
+
+        # 如果存在相同的文字既肯定又否定，则是重言式
+        return bool(positive_lits & negative_lits)
+
     def two_pointer_resolution(self):
         """
         优化的two-pointer resolution算法
@@ -80,6 +99,13 @@ class ResolutionProver:
 
         print(f"开始推理，初始子句数: {len(self.clauses)}")
 
+        # 显示初始子句
+        if self.show_detailed_steps:
+            print("初始子句:")
+            for i, clause in enumerate(self.clauses):
+                print(f"  {i}: {clause}")
+
+        iteration = 0
         while self.steps < self.max_steps:
             new_clauses = []
             n = len(self.clauses)
@@ -105,6 +131,10 @@ class ResolutionProver:
                                     # 执行归结
                                     resolvent = self.resolve(clause1, clause2, literal1, literal2, substitution)
 
+                                    # 跳过重言式
+                                    if self.is_tautology(resolvent):
+                                        continue
+
                                     # 记录推理步骤
                                     step_info = {
                                         'step': self.steps + 1,
@@ -119,12 +149,21 @@ class ResolutionProver:
                                     self.history.append(step_info)
                                     self.steps += 1
 
-                                    # 性能监控
-                                    if self.steps % 100 == 0:
-                                        current_time = time.time()
-                                        elapsed = current_time - start_time
-                                        print(
-                                            f"进度: {self.steps}步, 耗时: {elapsed:.2f}秒, 子句数: {len(self.clauses)}")
+                                    # 显示重要归结步骤（只有在用户选择显示详细步骤时才显示）
+                                    if self.show_detailed_steps and (resolvent.is_empty() or
+                                            len(resolvent.literals) <= 2 or  # 短子句
+                                            ("SearchedBy" in str(resolvent) and any(
+                                                c in str(resolvent) for c in ['o', 'd'])) or
+                                            ("DrugDealer" in str(resolvent) and 'o' in str(resolvent))):
+                                        print(f"\n步骤 {self.steps}: 重要归结")
+                                        print(f"  子句1: {clause1}")
+                                        print(f"  子句2: {clause2}")
+                                        print(f"  文字1: {literal1}")
+                                        print(f"  文字2: {literal2}")
+                                        if substitution:
+                                            subst_str = ", ".join(f"{k}→{v}" for k, v in substitution.items())
+                                            print(f"  替换: {subst_str}")
+                                        print(f"  结果: {resolvent}")
 
                                     # 如果得到空子句，返回成功
                                     if resolvent.is_empty():
@@ -149,7 +188,14 @@ class ResolutionProver:
 
             # 添加新子句到子句集
             self.clauses.extend(new_clauses)
-            print(f"生成 {len(new_clauses)} 个新子句，总子句数: {len(self.clauses)}")
+            print(f"迭代 {iteration}: 生成 {len(new_clauses)} 个新子句，总子句数: {len(self.clauses)}")
+            iteration += 1
+
+            # 性能监控
+            if iteration % 10 == 0:
+                current_time = time.time()
+                elapsed = current_time - start_time
+                print(f"进度: {iteration}次迭代, {self.steps}步, 耗时: {elapsed:.2f}秒")
 
         print(f"达到最大步数限制 {self.max_steps}，未找到证明")
         return False
@@ -157,19 +203,18 @@ class ResolutionProver:
     def print_resolution_history(self):
         """打印详细的推理历史"""
         print("\n=== 归结推理过程 ===")
-        for step in self.history[-20:]:  # 只显示最后20步
-            print(f"步骤 {step['step']}:")
-            print(f"  子句1: {step['clause1']}")
-            print(f"  子句2: {step['clause2']}")
-            print(f"  归结文字1: {step['literal1']}")
-            print(f"  归结文字2: {step['literal2']}")
+        # 显示所有推导出空子句或重要结果的步骤
+        important_steps = [step for step in self.history if step['is_empty'] or len(step['resolvent'].split('∨')) <= 3]
+
+        if not important_steps:
+            important_steps = self.history[-20:]  # 显示最后20步
+
+        for step in important_steps:
+            status = "★" if step['is_empty'] else " "
+            print(f"步骤 {step['step']}: {status}{step['resolvent']}")
             if step['substitution']:
-                subst_str = ", ".join(f"{var} → {val}" for var, val in step['substitution'].items())
-                print(f"  替换: {subst_str}")
-            print(f"  归结结果: {step['resolvent']}")
-            if step['is_empty']:
-                print("  ★ 推导出空子句！证明完成")
-            print()
+                subst_str = ", ".join(f"{k}→{v}" for k, v in step['substitution'].items())
+                print(f"      替换: {subst_str}")
 
     def get_statistics(self):
         """获取推理统计信息"""
