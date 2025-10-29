@@ -107,30 +107,34 @@ class Clause:
         return len(self.literals) == 0
 
     def standardize_variables(self, counter=None):
-        """标准化变量（变量重命名以避免冲突）"""
+        """标准化变量（修复版本）"""
         if counter is None:
             counter = {'x': 0}
 
+        # 创建变量映射表
+        var_mapping = {}
         new_literals = []
+
         for literal in self.literals:
             new_terms = []
             for term in literal.terms:
-                if term.is_variable:
-                    # 为每个变量生成新名称
-                    new_name = f"{term.name}_{counter['x']}"
-                    counter['x'] += 1
-                    new_terms.append(Term(new_name, is_variable=True))
-                else:
-                    # 递归处理函数参数中的变量
-                    new_args = []
-                    for arg in term.args:
-                        if arg.is_variable:
-                            new_name = f"{arg.name}_{counter['x']}"
-                            counter['x'] += 1
-                            new_args.append(Term(new_name, is_variable=True))
-                        else:
-                            new_args.append(arg.copy())
-                    new_terms.append(Term(term.name, False, new_args))
+                new_terms.append(self._standardize_term(term, var_mapping, counter))
             new_literals.append(Literal(literal.predicate, new_terms, literal.negated))
 
         return Clause(new_literals, self.source)
+
+    def _standardize_term(self, term, var_mapping, counter):
+        """标准化单个项"""
+        if term.is_variable:
+            # 相同的变量名映射到相同的新名称
+            if term.name not in var_mapping:
+                new_name = f"v{counter['x']}"
+                counter['x'] += 1
+                var_mapping[term.name] = Term(new_name, is_variable=True)
+            return var_mapping[term.name]
+        elif term.args:
+            # 递归处理函数参数
+            new_args = [self._standardize_term(arg, var_mapping, counter) for arg in term.args]
+            return Term(term.name, False, new_args)
+        else:
+            return term.copy()
